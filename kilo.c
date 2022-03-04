@@ -16,31 +16,38 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 /*** data ***/
-struct termios orig_termios;
+struct editorConfig {
+	struct termios orig_termios;
+};
+
+struct editorConfig E;
 
 /*** terminal ***/
 
 // Prints error message and exits program
 void die(const char *s) {
+	write(STDOUT_FILENO, "\x1b[2J", 4);
+	write(STDOUT_FILENO, "\x1b[H", 3);
+	
 	perror(s);
 	exit(1);
 }
 
 // Return terminal to original settings on exit
 void disableRawMode() {
-	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) {
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) {
 		die("tcsetattr");
 	}
 }
 
 // Take control over terminal settings and flags
 void enableRawMode() {
-	if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) {
+	if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) {
 		die("tcgetattr");
 	}
 	atexit(disableRawMode);
 	
-	struct termios raw = orig_termios;
+	struct termios raw = E.orig_termios;
 	// Flags to disable
 	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
 	raw.c_iflag &= ~(OPOST);
@@ -68,8 +75,19 @@ char editorReadKey() {
 
 /*** output ***/
 
+void editorDrawRows() {
+	int y;
+	for (y = 0; y < 24; y++) {
+		write(STDOUT_FILENO, "~\r\n", 3);
+	}
+}
+
 void editorRefreshScreen() {
 	write(STDOUT_FILENO, "\x1b[2J", 4);
+	write(STDOUT_FILENO, "\x1b[H", 3);
+	
+	editorDrawRows();
+	
 	write(STDOUT_FILENO, "\x1b[H", 3);
 }
 
@@ -81,6 +99,8 @@ void editorProcessKeypress() {
 	
 	switch (c) {
 		case CTRL_KEY('q'):
+			write(STDOUT_FILENO, "\x1b[2J", 4);
+			write(STDOUT_FILENO, "\x1b[H", 3);
 			exit(0);
 			break;
 	}
